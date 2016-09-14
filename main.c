@@ -17,7 +17,7 @@
 LOG_FLAG_s    gLog_flags = {.BitFlag[0]=1};
 ////////////////////////////////////////////////
 static smf_err_t
-_my_elem_init(
+_user_elem_init(
     smf_elem_priv_info_t    *pElem_prev)
 {
     smf_err_t       rval = SMF_ERR_OK;
@@ -26,7 +26,7 @@ _my_elem_init(
 }
 
 static smf_err_t
-_my_elem_deinit(
+_user_elem_deinit(
     smf_elem_priv_info_t    *pElem_prev)
 {
     smf_err_t       rval = SMF_ERR_OK;
@@ -35,7 +35,7 @@ _my_elem_deinit(
 }
 
 static smf_err_t
-_my_elem_recv_msg(
+_user_elem_recv_msg(
     smf_elem_priv_info_t    *pElem_prev,
     void                    *pMsg,
     smf_args_t              *pShare_info)
@@ -55,7 +55,9 @@ _my_elem_recv_msg(
 
 //=========================================================================
 static void
-_mbox_release(mbox_t    *pMbox)
+_mbox_release(
+    mbox_t      *pMbox,
+    void        *pExtra_data)
 {
     printf("%s: ref cnt= %ld\n", __func__, pMbox->ref_cnt);
     if( pMbox->ref_cnt == 1 )
@@ -93,26 +95,26 @@ int main()
         Smf_Elem_New(pHSmf, SMF_ELEM_CUSTOMIZATION, &pElem_cust);
         pElem_cust->uid       = MY_ELEM_UID_1;
         pElem_cust->name      = "elem_1";
-        pElem_cust->cbInit    = _my_elem_init;
-        pElem_cust->cbDeInit  = _my_elem_deinit;
+        pElem_cust->cbInit    = _user_elem_init;
+        pElem_cust->cbDeInit  = _user_elem_deinit;
         Smf_Elem_Bind(pHSmf, pElem_test, pElem_cust);
 
         // element 2
         Smf_Elem_New(pHSmf, SMF_ELEM_CUSTOMIZATION, &pElem_cust);
         pElem_cust->uid       = MY_ELEM_UID_2;
         pElem_cust->name      = "elem_2";
-        pElem_cust->cbInit    = _my_elem_init;
-        pElem_cust->cbDeInit  = _my_elem_deinit;
-        pElem_cust->cbRecvMsg = _my_elem_recv_msg;
+        pElem_cust->cbInit    = _user_elem_init;
+        pElem_cust->cbDeInit  = _user_elem_deinit;
+        pElem_cust->cbRecvMsg = _user_elem_recv_msg;
         Smf_Elem_Bind(pHSmf, pElem_test, pElem_cust);
 
         // element B
         Smf_Elem_New(pHSmf, SMF_ELEM_CUSTOMIZATION, &pElem_cust);
         pElem_cust->uid       = MY_ELEM_UID_B;
         pElem_cust->name      = "elem_B";
-        pElem_cust->cbInit    = _my_elem_init;
-        pElem_cust->cbDeInit  = _my_elem_deinit;
-        pElem_cust->cbRecvMsg = _my_elem_recv_msg;
+        pElem_cust->cbInit    = _user_elem_init;
+        pElem_cust->cbDeInit  = _user_elem_deinit;
+        pElem_cust->cbRecvMsg = _user_elem_recv_msg;
         Smf_Elem_Add(pHSmf, pElem_cust);
 
         // launch service

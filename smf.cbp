@@ -41,7 +41,7 @@
 		<Unit filename="main.c">
 			<Option compilerVar="CC" />
 		</Unit>
-		<Unit filename="smf/elem_test.c">
+		<Unit filename="smf/elem_my_elem.c">
 			<Option compilerVar="CC" />
 		</Unit>
 		<Unit filename="smf/smf_ctrl.c">

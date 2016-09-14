@@ -54,7 +54,7 @@ _smf_register_element(smf_elem_desc_t  **ppFirstDesc)
     if( bInitialized )
         return;
 
-    SMF_REGISTER_ELEMENT(g_elem_test_desc, ppFirstDesc);
+    SMF_REGISTER_ELEMENT(g_elem_my_elem_desc, ppFirstDesc);
 
 
     // reserve for user implement by self

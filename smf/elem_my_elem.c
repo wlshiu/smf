@@ -40,7 +40,7 @@ typedef struct elem_mgr
 //                  Private Function Definition
 //=============================================================================
 static long
-_test_cmp_priority(
+_my_elem_cmp_priority(
     smf_pmsgq_priority_t     *pPri_a,
     smf_pmsgq_priority_t     *pPri_b)
 {
@@ -48,13 +48,13 @@ _test_cmp_priority(
 }
 
 static smf_pmsgq_priority_t*
-_test_get_priority(void  *pNode)
+_my_elem_get_priority(void  *pNode)
 {
     return &((mbox_t*)pNode)->base.priority;
 }
 
 static void
-_test_set_priority(
+_my_elem_set_priority(
     void                    *pNode,
     smf_pmsgq_priority_t    *pPri)
 {
@@ -63,19 +63,19 @@ _test_set_priority(
 
 
 static long
-_test_get_position(void *pNode)
+_my_elem_get_position(void *pNode)
 {
     return ((mbox_t*)pNode)->base.position;
 }
 
 static void
-_test_set_position(void *pNode, long pos)
+_my_elem_set_position(void *pNode, long pos)
 {
     ((mbox_t*)pNode)->base.position = pos;
 }
 
 static void*
-_thread_test(void   *arg)
+_thread_my_elem(void   *arg)
 {
     smf_err_t               rval = SMF_ERR_OK;
     smf_elem_priv_info_t    *pElem_prev = (smf_elem_priv_info_t*)arg;
@@ -97,7 +97,7 @@ _thread_test(void   *arg)
             {
                 cbMboxDestroy = pMbox->cbMboxDestroy;
                 printf("%s: call delete\n", __func__);
-                cbMboxDestroy(pMbox);
+                cbMboxDestroy(pMbox, (void*)pElem_prev);
             }
 
         } while(0);
@@ -112,7 +112,7 @@ _thread_test(void   *arg)
 }
 
 static smf_err_t
-_test_init(
+_my_elem_init(
     smf_elem_priv_info_t    *pElem_prev)
 {
     smf_err_t       rval = SMF_ERR_OK;
@@ -136,12 +136,12 @@ _test_init(
 
 
         init_info.amount_nodes = 10;
-        init_info.cbPriGet     = _test_get_priority;
-        init_info.cbPriSet     = _test_set_priority;
-        init_info.cbPriCmp     = _test_cmp_priority;
+        init_info.cbPriGet     = _my_elem_get_priority;
+        init_info.cbPriSet     = _my_elem_set_priority;
+        init_info.cbPriCmp     = _my_elem_cmp_priority;
 
-        init_info.cbPosGet     = _test_get_position;
-        init_info.cbPosSet     = _test_set_position;
+        init_info.cbPosGet     = _my_elem_get_position;
+        init_info.cbPosSet     = _my_elem_set_position;
         SmfPMsgq_Create(&pHPMsg, &init_info);
 
         //---------------------
@@ -149,7 +149,7 @@ _test_init(
         pElem_prev->pTunnelInfo[0] = (void*)pMgr;
         pElem_prev->pTunnelInfo[1] = (void*)pHPMsg;
 
-        pthread_create(&pMgr->tid, NULL, _thread_test, (void*)pElem_prev);
+        pthread_create(&pMgr->tid, NULL, _thread_my_elem, (void*)pElem_prev);
 
     } while(0);
 
@@ -157,7 +157,7 @@ _test_init(
 }
 
 static smf_err_t
-_test_deinit(
+_my_elem_deinit(
     smf_elem_priv_info_t    *pElem_prev)
 {
     smf_err_t       rval = SMF_ERR_OK;
@@ -187,7 +187,7 @@ _test_deinit(
 }
 
 static smf_err_t
-_test_elem_recv_msg(
+_my_elem_elem_recv_msg(
     smf_elem_priv_info_t    *pElem_prev,
     void                    *pMsg,
     smf_args_t              *pShare_info)
@@ -209,15 +209,15 @@ _test_elem_recv_msg(
 //=============================================================================
 //                  Public Function Definition
 //=============================================================================
-smf_elem_desc_t         g_elem_test_desc =
+smf_elem_desc_t         g_elem_my_elem_desc =
 {
     .elem_priv =
     {
         .uid       = SMF_ELEM_TEST,
-        .name      = "test element",
-        .cbInit    = _test_init,
-        .cbDeInit  = _test_deinit,
-        .cbRecvMsg = _test_elem_recv_msg,
+        .name      = "my element",
+        .cbInit    = _my_elem_init,
+        .cbDeInit  = _my_elem_deinit,
+        .cbRecvMsg = _my_elem_elem_recv_msg,
     },
 };
 #else   // #if (CFG_ENABLE_ELEM_TEST)

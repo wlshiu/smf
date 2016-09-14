@@ -31,7 +31,7 @@ extern "C" {
 //                  Structure Definition
 //=============================================================================
 struct mbox;
-typedef void (*CB_MBOX_DESTROY)(struct mbox *pMbox);
+typedef void (*CB_MBOX_DESTROY)(struct mbox *pMbox, void *pExtra_data);
 /**
  *  message box
  */
@@ -42,6 +42,7 @@ typedef struct mbox
     long                ref_cnt;
     long                frome;
 
+    void                *pMbox_mutex;
     CB_MBOX_DESTROY     cbMboxDestroy;
 
     union {
@@ -49,6 +50,12 @@ typedef struct mbox
             void        *pAddr;
         } def;
     } data;
+
+    // user attaches private info
+    void                *pTunnel_info[2];
+
+    // for share memory case if user wants
+    long                is_used;
 
 } mbox_t;
 //=============================================================================
