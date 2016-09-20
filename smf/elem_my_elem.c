@@ -85,7 +85,7 @@ _thread_my_elem(void   *arg)
     while( pMgr->isLoop )
     {
         mbox_t              *pMbox = 0;
-        CB_MBOX_DESTROY     cbMboxDestroy = 0;
+        CB_MBOX_DESTROY     cb_mbox_destroy = 0;
 
         // pthread_mutex_lock(&pMgr->mutex);
         do {
@@ -93,11 +93,11 @@ _thread_my_elem(void   *arg)
             if( rval )      break;
 
 
-            if( pMbox->cbMboxDestroy )
+            if( pMbox->cb_mbox_destroy )
             {
-                cbMboxDestroy = pMbox->cbMboxDestroy;
-                printf("%s: call delete\n", __func__);
-                cbMboxDestroy(pMbox, (void*)pElem_prev);
+                cb_mbox_destroy = pMbox->cb_mbox_destroy;
+                dbg("'%s' call delete\n", pElem_prev->name);
+                cb_mbox_destroy(&pMbox, (void*)pElem_prev);
             }
 
         } while(0);
@@ -117,7 +117,7 @@ _my_elem_init(
 {
     smf_err_t       rval = SMF_ERR_OK;
 
-    printf("%s[%d] enter %s\n", __func__, __LINE__, pElem_prev->name);
+    dbg("enter %s\n", pElem_prev->name);
     do {
         elem_mgr_t              *pMgr = 0;
         smf_pmsgq_handle_t       *pHPMsg = 0;
@@ -161,7 +161,7 @@ _my_elem_deinit(
     smf_elem_priv_info_t    *pElem_prev)
 {
     smf_err_t       rval = SMF_ERR_OK;
-    printf("%s[%d] enter %s\n", __func__, __LINE__, pElem_prev->name);
+    dbg("enter %s\n", pElem_prev->name);
     do {
         elem_mgr_t              *pMgr = (elem_mgr_t*)pElem_prev->pTunnelInfo[0];
         smf_pmsgq_handle_t      *pHPMsg = (smf_pmsgq_handle_t*)pElem_prev->pTunnelInfo[1];
@@ -194,7 +194,7 @@ _my_elem_elem_recv_msg(
 {
     smf_err_t       rval = SMF_ERR_OK;
 
-    printf("%s[%d] enter %s\n", __func__, __LINE__, pElem_prev->name);
+    dbg("enter %s\n", pElem_prev->name);
     do {
         // elem_mgr_t              *pMgr = (elem_mgr_t*)pElem_prev->pTunnelInfo[0];
         smf_pmsgq_handle_t      *pHPMsg = (smf_pmsgq_handle_t*)pElem_prev->pTunnelInfo[1];

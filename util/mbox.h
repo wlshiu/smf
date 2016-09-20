@@ -31,7 +31,13 @@ extern "C" {
 //                  Structure Definition
 //=============================================================================
 struct mbox;
-typedef void (*CB_MBOX_DESTROY)(struct mbox *pMbox, void *pExtra_data);
+
+typedef int (*CB_MBOX_MUTEX_INIT)(struct mbox *pMbox, void *pExtra_data);
+typedef int (*CB_MBOX_MUTEX_DEINIT)(struct mbox *pMbox, void *pExtra_data);
+typedef int (*CB_MBOX_MUTEX_LOCK)(struct mbox *pMbox, void *pExtra_data);
+typedef int (*CB_MBOX_MUTEX_UNLOCK)(struct mbox *pMbox, void *pExtra_data);
+
+typedef void (*CB_MBOX_DESTROY)(struct mbox **ppMbox, void *pExtra_data);
 /**
  *  message box
  */
@@ -40,10 +46,14 @@ typedef struct mbox
     smf_pmsgq_base_t    base;
 
     long                ref_cnt;
-    long                frome;
+    long                from;
 
-    void                *pMbox_mutex;
-    CB_MBOX_DESTROY     cbMboxDestroy;
+    CB_MBOX_MUTEX_INIT      cb_mbox_mutex_init;
+    CB_MBOX_MUTEX_DEINIT    cb_mbox_mutex_deinit;
+    CB_MBOX_MUTEX_LOCK      cb_mbox_mutex_lock;
+    CB_MBOX_MUTEX_UNLOCK    cb_mbox_mutex_unlock;
+
+    CB_MBOX_DESTROY     cb_mbox_destroy;
 
     union {
         struct {

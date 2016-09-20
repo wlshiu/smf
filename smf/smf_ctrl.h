@@ -138,6 +138,13 @@ Smf_Elem_New(
 
 
 smf_err_t
+Smf_Elem_Del(
+    smf_handle_t        *pHSmf,
+    unsigned long       uid,
+    void                *pExtra_data);
+
+
+smf_err_t
 Smf_Elem_Bind(
     smf_handle_t            *pHSmf,
     smf_elem_priv_info_t    *pElem_cur,

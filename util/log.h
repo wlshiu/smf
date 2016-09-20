@@ -68,6 +68,13 @@ extern LOG_FLAG_s    gLog_flags;
 #define log_off(type)                       LOG_FLAG_CLR(&gLog_flags, type)
 
 
+#define dbg(str, args...)                   do{ extern pthread_mutex_t  g_mutex_msg;                           \
+                                                pthread_mutex_lock(&g_mutex_msg);                              \
+                                                fprintf(stderr, "%s[%d]=> " str, __func__, __LINE__, ## args); \
+                                                pthread_mutex_unlock(&g_mutex_msg);                            \
+                                            }while(0)
+
+
 #ifdef __cplusplus
 }
 #endif

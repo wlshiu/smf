@@ -16,6 +16,7 @@
 					<Add directory="smf" />
 					<Add directory="util" />
 					<Add directory="../../../_portable/CodeBlocks/MinGW/include" />
+					<Add directory="../smf" />
 				</Compiler>
 				<Linker>
 					<Add library="../../../_portable/CodeBlocks/MinGW/lib/libpthread.a" />
@@ -41,6 +42,10 @@
 		<Unit filename="main.c">
 			<Option compilerVar="CC" />
 		</Unit>
+		<Unit filename="mleak_check.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="mleak_check.h" />
 		<Unit filename="smf/elem_my_elem.c">
 			<Option compilerVar="CC" />
 		</Unit>

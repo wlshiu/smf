@@ -12,7 +12,9 @@
 
 
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
+#include "mleak_check.h"
 #include "log.h"
 #include "smf_def.h"
 #include "smf_ctrl.h"
@@ -328,8 +330,8 @@ Smf_Elem_New(
         }
         memcpy(pElem_desc_new, pElem_desc_pattern, sizeof(smf_elem_desc_t));
 
-        pElem_desc_new->next               = 0;
-        pElem_desc_new->prev               = 0;
+        pElem_desc_new->next = 0;
+        pElem_desc_new->prev = 0;
 
         *ppElem_info = &pElem_desc_new->elem_priv;
     } while(0);
@@ -341,22 +343,141 @@ Smf_Elem_New(
 
 smf_err_t
 Smf_Elem_Del(
-    smf_handle_t            *pHSmf,
-    smf_elem_priv_info_t    **ppElem_info)
+    smf_handle_t        *pHSmf,
+    unsigned long       uid,
+    void                *pExtra_data)
 {
     smf_err_t       rval = SMF_ERR_OK;
     smf_dev_t       *pDev = STRUCTURE_POINTER(smf_dev_t, pHSmf, hSmf);
 
     _smf_verify_handle(pHSmf, SMF_ERR_INVALID_PARAM);
-    _smf_verify_handle(ppElem_info, SMF_ERR_INVALID_PARAM);
-    _smf_verify_handle(*ppElem_info, SMF_ERR_INVALID_PARAM);
 
     smf_mutex_lock(&pDev->smf_mutex);
     do {
+        smf_elem_desc_t         *pElem_desc_cur = pDev->pElem_head;
 
-        // find target element
-        // TODO: malloc element instance
+        while( pElem_desc_cur )
+        {
+            bool                bDone = false;
+            smf_linker_t        *pLinker_cur = pElem_desc_cur->pLinker_head;
 
+            // parent element
+            if( pElem_desc_cur->elem_priv.uid == uid )
+            {
+                smf_args_t          args = {.arg[0] = {0}};
+                smf_args_t          share2Next = {.arg[0] = {0}};
+                smf_elem_desc_t     *pElem_desc_tmp = pElem_desc_cur;
+
+                if( pElem_desc_cur->prev )
+                    pElem_desc_cur->prev->next = pElem_desc_cur->next;
+
+                if( pElem_desc_cur->next )
+                    pElem_desc_cur->next->prev = pElem_desc_cur->prev;
+
+                // update head elenemt
+                if( pElem_desc_cur->prev )
+                {
+                    pElem_desc_cur = pElem_desc_cur->prev;
+                    while( pElem_desc_cur && pElem_desc_cur->prev )
+                        pElem_desc_cur = pElem_desc_cur->prev;
+                }
+                else if( pElem_desc_cur->next )
+                {
+                    pElem_desc_cur = pElem_desc_cur->next;
+                    while( pElem_desc_cur && pElem_desc_cur->prev )
+                        pElem_desc_cur = pElem_desc_cur->prev;
+                }
+                else
+                    pElem_desc_cur = 0;
+
+                pDev->pElem_head = pElem_desc_cur;
+
+                // update current element
+                while( pElem_desc_cur && pElem_desc_cur->next )
+                    pElem_desc_cur = pElem_desc_cur->next;
+
+                pDev->pElem_cur = pElem_desc_cur;
+
+                _smf_element_deinit(pElem_desc_tmp, &args, &share2Next);
+                free(pElem_desc_tmp);
+
+                // delete child elements
+                while( pLinker_cur )
+                {
+                    smf_elem_desc_t     *pElem_desc_act_child = pLinker_cur->pElem_desc;
+                    smf_linker_t        *pLinker_tmp = pLinker_cur;
+
+                    // delete current child element
+                    _smf_element_deinit(pElem_desc_act_child, &args, &share2Next);
+
+                    pLinker_cur = pLinker_cur->next;
+
+                    free(pLinker_tmp);
+                    free(pElem_desc_act_child);
+                }
+                break;
+            }
+
+            // search child elements
+            while( pLinker_cur )
+            {
+                smf_elem_desc_t     *pElem_desc_act_child = pLinker_cur->pElem_desc;
+
+                if( pElem_desc_act_child->elem_priv.uid == uid )
+                {
+                    smf_args_t      args = {.arg[0] = {0}};
+                    smf_args_t      share2Next = {.arg[0] = {0}};
+                    smf_linker_t    *pLinker_tmp = pLinker_cur;
+
+                    // delete current child element
+                    _smf_element_deinit(pElem_desc_act_child, &args, &share2Next);
+
+                    if( pLinker_cur->prev )
+                        pLinker_cur->prev->next = pLinker_cur->next;
+
+                    if( pLinker_cur->next )
+                        pLinker_cur->next->prev = pLinker_cur->prev;
+
+                    // update head linker
+                    if( pLinker_cur->prev )
+                    {
+                        pLinker_cur = pLinker_cur->prev;
+                        while( pLinker_cur && pLinker_cur->prev )
+                            pLinker_cur = pLinker_cur->prev;
+                    }
+                    else if( pLinker_cur->next )
+                    {
+                        pLinker_cur = pLinker_cur->next;
+                        while( pLinker_cur && pLinker_cur->prev )
+                            pLinker_cur = pLinker_cur->prev;
+                    }
+                    else
+                        pLinker_cur = 0;
+
+                    pElem_desc_cur->pLinker_head = pLinker_cur;
+
+                    // update current linker
+                    while( pLinker_cur && pLinker_cur->next )
+                        pLinker_cur = pLinker_cur->next;
+
+                    pElem_desc_cur->pLinker_cur = pLinker_cur;
+
+                    // release element
+                    pLinker_tmp->next = pLinker_tmp->prev = 0;
+                    free(pLinker_tmp);
+                    free(pElem_desc_act_child);
+
+                    bDone = true;
+                    break;
+                }
+
+                pLinker_cur = pLinker_cur->next;
+            }
+
+            if( bDone )     break;
+
+            pElem_desc_cur = pElem_desc_cur->next;
+        }
     } while(0);
 
     smf_mutex_unlock(&pDev->smf_mutex);
@@ -456,7 +577,6 @@ Smf_Elem_Add(
 
     return rval;
 }
-
 
 smf_err_t
 Smf_Start(
