@@ -84,7 +84,7 @@ typedef struct smf_elem_priv_info
     char                *name;
 
     // for user use
-    void                *pTunnelInfo[4];
+    void                *pTunnel_info[4];
 
     // inint method
     smf_err_t (*cbInit)(struct smf_elem_priv_info *pElem_prev);
@@ -93,7 +93,12 @@ typedef struct smf_elem_priv_info
     smf_err_t (*cbDeInit)(struct smf_elem_priv_info *pElem_prev);
 
     /**
-     *  Receive msg:
+     *  If user want to handle something after de-initialize. e.g. release something which is attached at pTunnel_info[]
+     */
+    void (*cbAfterDeInit)(struct smf_elem_priv_info *pElem_prev);
+
+    /**
+     *  Receive message:
      *      It should not be braked
      */
     smf_err_t (*cbRecvMsg)(struct smf_elem_priv_info *pElem_prev, void *pMsg, smf_args_t *pShare2Next);

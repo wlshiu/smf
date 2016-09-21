@@ -11,10 +11,12 @@
 
 #include "mbox.h"
 #include "pthread.h"
+#include "mleak_check.h"
 //=============================================================================
 //                  Constant Definition
 //=============================================================================
-
+#define ELEM_MY_ELEM__MGR_IDX            1
+#define ELEM_MY_ELEM__MSGQ_IDX           2
 //=============================================================================
 //                  Macro Definition
 //=============================================================================
@@ -79,8 +81,8 @@ _thread_my_elem(void   *arg)
 {
     smf_err_t               rval = SMF_ERR_OK;
     smf_elem_priv_info_t    *pElem_prev = (smf_elem_priv_info_t*)arg;
-    elem_mgr_t              *pMgr = (elem_mgr_t*)pElem_prev->pTunnelInfo[0];
-    smf_pmsgq_handle_t      *pHPMsg = (smf_pmsgq_handle_t*)pElem_prev->pTunnelInfo[1];
+    elem_mgr_t              *pMgr = (elem_mgr_t*)pElem_prev->pTunnel_info[ELEM_MY_ELEM__MGR_IDX];
+    smf_pmsgq_handle_t      *pHPMsg = (smf_pmsgq_handle_t*)pElem_prev->pTunnel_info[ELEM_MY_ELEM__MSGQ_IDX];
 
     while( pMgr->isLoop )
     {
@@ -146,8 +148,8 @@ _my_elem_init(
 
         //---------------------
         // attach
-        pElem_prev->pTunnelInfo[0] = (void*)pMgr;
-        pElem_prev->pTunnelInfo[1] = (void*)pHPMsg;
+        pElem_prev->pTunnel_info[ELEM_MY_ELEM__MGR_IDX]  = (void*)pMgr;
+        pElem_prev->pTunnel_info[ELEM_MY_ELEM__MSGQ_IDX] = (void*)pHPMsg;
 
         pthread_create(&pMgr->tid, NULL, _thread_my_elem, (void*)pElem_prev);
 
@@ -162,10 +164,17 @@ _my_elem_deinit(
 {
     smf_err_t       rval = SMF_ERR_OK;
     dbg("enter %s\n", pElem_prev->name);
+
     do {
-        elem_mgr_t              *pMgr = (elem_mgr_t*)pElem_prev->pTunnelInfo[0];
-        smf_pmsgq_handle_t      *pHPMsg = (smf_pmsgq_handle_t*)pElem_prev->pTunnelInfo[1];
+        elem_mgr_t              *pMgr = (elem_mgr_t*)pElem_prev->pTunnel_info[ELEM_MY_ELEM__MGR_IDX];
+        smf_pmsgq_handle_t      *pHPMsg = (smf_pmsgq_handle_t*)pElem_prev->pTunnel_info[ELEM_MY_ELEM__MSGQ_IDX];
         pthread_mutex_t         mutex;
+
+        if( !pMgr || !pHPMsg )
+        {
+            dbg("null input %p, %p\n", pMgr, pHPMsg);
+            break;
+        }
 
         pMgr->isLoop = 0;
         pthread_join(pMgr->tid, NULL);
@@ -174,10 +183,12 @@ _my_elem_deinit(
 
         mutex = pMgr->mutex;
 
-
         SmfPMsgq_Destroy(&pHPMsg);
 
         free(pMgr);
+
+        pElem_prev->pTunnel_info[ELEM_MY_ELEM__MGR_IDX]  = 0;
+        pElem_prev->pTunnel_info[ELEM_MY_ELEM__MSGQ_IDX] = 0;
 
         pthread_mutex_unlock(&mutex);
         pthread_mutex_destroy(&mutex);
@@ -194,13 +205,13 @@ _my_elem_elem_recv_msg(
 {
     smf_err_t       rval = SMF_ERR_OK;
 
-    dbg("enter %s\n", pElem_prev->name);
     do {
-        // elem_mgr_t              *pMgr = (elem_mgr_t*)pElem_prev->pTunnelInfo[0];
-        smf_pmsgq_handle_t      *pHPMsg = (smf_pmsgq_handle_t*)pElem_prev->pTunnelInfo[1];
+        // elem_mgr_t              *pMgr = (elem_mgr_t*)pElem_prev->pTunnel_info[ELEM_MY_ELEM__MGR_IDX];
+        smf_pmsgq_handle_t      *pHPMsg = (smf_pmsgq_handle_t*)pElem_prev->pTunnel_info[ELEM_MY_ELEM__MSGQ_IDX];
         mbox_t                  *pMbox = (mbox_t*)pMsg;
 
         pMbox->ref_cnt++;
+        dbg("enter '%s', ref= %d, msg= %p, share= %d\n", pElem_prev->name, pMbox->ref_cnt, pMsg, pShare_info->arg[0].u32_value);
         SmfPMsgq_Node_Push(pHPMsg, pMbox);
 
     } while(0);

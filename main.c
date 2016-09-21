@@ -37,6 +37,18 @@ _user_elem_deinit(
     return rval;
 }
 
+static void
+_user_after_deinit(
+    smf_elem_priv_info_t    *pElem_prev)
+{
+    unsigned char    *pBuf = pElem_prev->pTunnel_info[0];
+    dbg("check pTunnel_info[0]= %p\n", pBuf);
+    if( pBuf )      free(pBuf);
+
+    pElem_prev->pTunnel_info[0] = 0;
+    return;
+}
+
 static smf_err_t
 _user_elem_recv_msg(
     smf_elem_priv_info_t    *pElem_prev,
@@ -44,11 +56,10 @@ _user_elem_recv_msg(
     smf_args_t              *pShare_info)
 {
     smf_err_t       rval = SMF_ERR_OK;
-    // mbox_t          *pMbox = (mbox_t*)pMsg;
-    // pMbox->ref_cnt++;
+     mbox_t          *pMbox = (mbox_t*)pMsg;
 
     pShare_info->arg[0].u32_value++;
-    dbg("enter '%s', msg= %p, %d\n", pElem_prev->name, pMsg, pShare_info->arg[0].u32_value);
+    dbg("enter '%s', ref= %d, msg= %p, share= %d\n", pElem_prev->name, pMbox->ref_cnt, pMsg, pShare_info->arg[0].u32_value);
     return rval;
 }
 //=========================================================================
@@ -92,7 +103,7 @@ _mbox_release(
     dbg("ref cnt= %ld\n", pMbox->ref_cnt);
     if( pMbox->ref_cnt == 1 )
     {
-        dbg("%s\n", (char*)pMbox->data.def.pAddr);
+        dbg("real free data '%s'\n", (char*)pMbox->data.def.pAddr);
 
         if( pMbox->cb_mbox_mutex_unlock )
             pMbox->cb_mbox_mutex_unlock(pMbox, pExtra_data);
@@ -130,8 +141,11 @@ int main()
 
         // element A
         Smf_Elem_New(pHSmf, SMF_ELEM_TEST, &pElem_test);
-        pElem_test->uid  = MY_ELEM_UID_A;
-        pElem_test->name = "elem_A";
+        pElem_test->uid             = MY_ELEM_UID_A;
+        pElem_test->name            = "elem_A";
+        pElem_test->pTunnel_info[0] = malloc(10);
+        dbg("attach pTunnel_info[0]= %p\n", pElem_test->pTunnel_info[0]);
+        pElem_test->cbAfterDeInit   = _user_after_deinit;
         Smf_Elem_Add(pHSmf, pElem_test);
 
         // element 1
@@ -167,6 +181,7 @@ int main()
             mbox_t    *pMbox = malloc(sizeof(mbox_t));
 
             memset(pMbox, 0x0, sizeof(mbox_t));
+            dbg("send mbox= %p\n", pMbox);
 
             pMbox->base.priority.u.u32_value = 1;
             pMbox->cb_mbox_destroy           = _mbox_release;
@@ -189,14 +204,13 @@ int main()
             dbg("\n----------\n delete 'x%x'\n", act_uid);
             Smf_Elem_Del(pHSmf, act_uid, 0);
 
-            Smf_Elem_Del(pHSmf, MY_ELEM_UID_B, 0);
-            dbg("\n----------\n");
+            dbg("----------\n");
         }
-
 
         Smf_Stop(pHSmf, SMF_ELEM_ORDER_BACKWARD, 0);
     }
 
+    dbg("---- destroy ------\n");
     Smf_Destroy(&pHSmf);
 
     mlead_dump();

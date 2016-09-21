@@ -28,7 +28,10 @@ typedef smf_err_t (*CB_EXECUTE)(smf_elem_desc_t *pElem_desc, struct smf_args *pA
 //=============================================================================
 //                  Macro Definition
 //=============================================================================
-
+#define _elem_init(pElem_priv)                              ((pElem_priv) && (pElem_priv)->cbInit) ? (pElem_priv)->cbInit(pElem_priv) : 0
+#define _elem_deinit(pElem_priv)                            ((pElem_priv) && (pElem_priv)->cbDeInit) ? (pElem_priv)->cbDeInit(pElem_priv) : 0
+#define _elem_after_deinit(pElem_priv)                      ((pElem_priv) && (pElem_priv)->cbAfterDeInit) ? (pElem_priv)->cbAfterDeInit(pElem_priv) : 0
+#define _elem_recv_msg(pElem_priv, pMsg, pShare2Next)       ((pElem_priv) && (pElem_priv)->cbRecvMsg) ? (pElem_priv)->cbRecvMsg(pElem_priv, pMsg, pShare2Next) : 0
 //=============================================================================
 //                  Structure Definition
 //=============================================================================
@@ -85,17 +88,14 @@ _smf_element_init(
     smf_args_t          *pShare2Next)
 {
     smf_err_t               rval = SMF_ERR_OK;
-    smf_elem_priv_info_t    *pelem_priv = &pElem_desc->elem_priv;
+    smf_elem_priv_info_t    *pElem_priv = &pElem_desc->elem_priv;
 
-    if( pelem_priv->cbInit )
+    if( (rval = _elem_init(pElem_priv)) )
     {
-        if( (rval = pelem_priv->cbInit(pelem_priv)) )
-        {
-            log_err("element (x%lx, name= %s) init fail (err= x%x)\n",
-                    pelem_priv->uid,
-                    (pelem_priv->name) ? pelem_priv->name : "N/A",
-                    rval);
-        }
+        log_err("element (x%lx, name= %s) init fail (err= x%x)\n",
+                pElem_priv->uid,
+                (pElem_priv->name) ? pElem_priv->name : "N/A",
+                rval);
     }
     return rval;
 }
@@ -108,18 +108,18 @@ _smf_element_deinit(
     smf_args_t          *pShare2Next)
 {
     smf_err_t               rval = SMF_ERR_OK;
-    smf_elem_priv_info_t    *pelem_priv = &pElem_desc->elem_priv;
+    smf_elem_priv_info_t    *pElem_priv = &pElem_desc->elem_priv;
 
-    if( pelem_priv->cbDeInit )
+    if( (rval = _elem_deinit(pElem_priv)) )
     {
-        if( (rval = pelem_priv->cbDeInit(pelem_priv)) )
-        {
-            log_err("element (x%lx, name= %s) init fail (err= x%x)\n",
-                    pelem_priv->uid,
-                    (pelem_priv->name) ? pelem_priv->name : "N/A",
-                    rval);
-        }
+        log_err("element (x%lx, name= %s) init fail (err= x%x)\n",
+                pElem_priv->uid,
+                (pElem_priv->name) ? pElem_priv->name : "N/A",
+                rval);
     }
+
+    _elem_after_deinit(pElem_priv);
+
     return rval;
 }
 
@@ -130,17 +130,14 @@ _smf_element_send_msg(
     smf_args_t          *pShare2Next)
 {
     smf_err_t               rval = SMF_ERR_OK;
-    smf_elem_priv_info_t    *pelem_priv = &pElem_desc->elem_priv;
+    smf_elem_priv_info_t    *pElem_priv = &pElem_desc->elem_priv;
 
-    if( pelem_priv->cbRecvMsg )
+    if( (rval = _elem_recv_msg(pElem_priv, pArgs->arg[0].pAddr, pShare2Next)) )
     {
-        if( (rval = pelem_priv->cbRecvMsg(pelem_priv, pArgs->arg[0].pAddr, pShare2Next)) )
-        {
-            log_err("element (x%lx, name= %s) send msg fail (err= x%x)\n",
-                    pelem_priv->uid,
-                    (pelem_priv->name) ? pelem_priv->name : "N/A",
-                    rval);
-        }
+        log_err("element (x%lx, name= %s) send msg fail (err= x%x)\n",
+                pElem_priv->uid,
+                (pElem_priv->name) ? pElem_priv->name : "N/A",
+                rval);
     }
     return rval;
 }
@@ -217,6 +214,87 @@ _smf_execute_by_order(
     return rval;
 }
 
+static smf_err_t
+_dettach_elem(
+    smf_dev_t        *pDev,
+    smf_elem_desc_t  *pElem_desc)
+{
+    smf_err_t           rval = SMF_ERR_OK;
+    smf_elem_desc_t     *pCur_desc = pElem_desc;
+
+    if( pCur_desc->prev )
+        pCur_desc->prev->next = pCur_desc->next;
+
+    if( pCur_desc->next )
+        pCur_desc->next->prev = pCur_desc->prev;
+
+    // update head elenemt
+    if( pCur_desc->prev )
+    {
+        pCur_desc = pCur_desc->prev;
+        while( pCur_desc && pCur_desc->prev )
+            pCur_desc = pCur_desc->prev;
+    }
+    else if( pCur_desc->next )
+    {
+        pCur_desc = pCur_desc->next;
+        while( pCur_desc && pCur_desc->prev )
+            pCur_desc = pCur_desc->prev;
+    }
+    else
+        pCur_desc = 0;
+
+    pDev->pElem_head = pCur_desc;
+
+    // update current element
+    while( pCur_desc && pCur_desc->next )
+        pCur_desc = pCur_desc->next;
+
+    pDev->pElem_cur = pCur_desc;
+
+    return rval;
+}
+
+static smf_err_t
+_dettach_linker(
+    smf_elem_desc_t     *pCur_desc,
+    smf_linker_t        *pLinker_cur)
+{
+    smf_err_t           rval = SMF_ERR_OK;
+
+    // delete current child element
+    if( pLinker_cur->prev )
+        pLinker_cur->prev->next = pLinker_cur->next;
+
+    if( pLinker_cur->next )
+        pLinker_cur->next->prev = pLinker_cur->prev;
+
+    // update head linker
+    if( pLinker_cur->prev )
+    {
+        pLinker_cur = pLinker_cur->prev;
+        while( pLinker_cur && pLinker_cur->prev )
+            pLinker_cur = pLinker_cur->prev;
+    }
+    else if( pLinker_cur->next )
+    {
+        pLinker_cur = pLinker_cur->next;
+        while( pLinker_cur && pLinker_cur->prev )
+            pLinker_cur = pLinker_cur->prev;
+    }
+    else
+        pLinker_cur = 0;
+
+    pCur_desc->pLinker_head = pLinker_cur;
+
+    // update current linker
+    while( pLinker_cur && pLinker_cur->next )
+        pLinker_cur = pLinker_cur->next;
+
+    pCur_desc->pLinker_cur = pLinker_cur;
+
+    return rval;
+}
 //=============================================================================
 //                  Public Function Definition
 //=============================================================================
@@ -276,6 +354,7 @@ Smf_Destroy(
     if( ppHSmf && *ppHSmf )
     {
         smf_dev_t           *pDev = STRUCTURE_POINTER(smf_dev_t, (*ppHSmf), hSmf);
+        smf_elem_desc_t     *pElem_desc_cur = 0;
         smf_mutex_t         mutex;
 
         smf_mutex_lock(&pDev->smf_mutex);
@@ -283,7 +362,35 @@ Smf_Destroy(
 
         mutex = pDev->smf_mutex;
 
-        // TODO: release element descriptor
+        // release element descriptor
+        while( (pElem_desc_cur = pDev->pElem_head) )
+        {
+            smf_linker_t        *pLinker_cur = pElem_desc_cur->pLinker_head;
+            smf_args_t          args = {.arg[0] = {0}};
+            smf_args_t          share2Next = {.arg[0] = {0}};
+            smf_elem_desc_t     *pElem_desc_tmp = pElem_desc_cur;
+
+            // parent element
+            _dettach_elem(pDev, pElem_desc_cur);
+
+            _smf_element_deinit(pElem_desc_tmp, &args, &share2Next);
+            free(pElem_desc_tmp);
+
+            // delete child elements
+            while( pLinker_cur )
+            {
+                smf_elem_desc_t     *pElem_desc_act_child = pLinker_cur->pElem_desc;
+                smf_linker_t        *pLinker_tmp = pLinker_cur;
+
+                // delete current child element
+                _smf_element_deinit(pElem_desc_act_child, &args, &share2Next);
+
+                pLinker_cur = pLinker_cur->next;
+
+                free(pLinker_tmp);
+                free(pElem_desc_act_child);
+            }
+        }
 
         // destroy dev info
         free(pDev);
@@ -368,35 +475,7 @@ Smf_Elem_Del(
                 smf_args_t          share2Next = {.arg[0] = {0}};
                 smf_elem_desc_t     *pElem_desc_tmp = pElem_desc_cur;
 
-                if( pElem_desc_cur->prev )
-                    pElem_desc_cur->prev->next = pElem_desc_cur->next;
-
-                if( pElem_desc_cur->next )
-                    pElem_desc_cur->next->prev = pElem_desc_cur->prev;
-
-                // update head elenemt
-                if( pElem_desc_cur->prev )
-                {
-                    pElem_desc_cur = pElem_desc_cur->prev;
-                    while( pElem_desc_cur && pElem_desc_cur->prev )
-                        pElem_desc_cur = pElem_desc_cur->prev;
-                }
-                else if( pElem_desc_cur->next )
-                {
-                    pElem_desc_cur = pElem_desc_cur->next;
-                    while( pElem_desc_cur && pElem_desc_cur->prev )
-                        pElem_desc_cur = pElem_desc_cur->prev;
-                }
-                else
-                    pElem_desc_cur = 0;
-
-                pDev->pElem_head = pElem_desc_cur;
-
-                // update current element
-                while( pElem_desc_cur && pElem_desc_cur->next )
-                    pElem_desc_cur = pElem_desc_cur->next;
-
-                pDev->pElem_cur = pElem_desc_cur;
+                _dettach_elem(pDev, pElem_desc_cur);
 
                 _smf_element_deinit(pElem_desc_tmp, &args, &share2Next);
                 free(pElem_desc_tmp);
@@ -429,38 +508,9 @@ Smf_Elem_Del(
                     smf_args_t      share2Next = {.arg[0] = {0}};
                     smf_linker_t    *pLinker_tmp = pLinker_cur;
 
-                    // delete current child element
+                    _dettach_linker(pElem_desc_cur, pLinker_cur);
+
                     _smf_element_deinit(pElem_desc_act_child, &args, &share2Next);
-
-                    if( pLinker_cur->prev )
-                        pLinker_cur->prev->next = pLinker_cur->next;
-
-                    if( pLinker_cur->next )
-                        pLinker_cur->next->prev = pLinker_cur->prev;
-
-                    // update head linker
-                    if( pLinker_cur->prev )
-                    {
-                        pLinker_cur = pLinker_cur->prev;
-                        while( pLinker_cur && pLinker_cur->prev )
-                            pLinker_cur = pLinker_cur->prev;
-                    }
-                    else if( pLinker_cur->next )
-                    {
-                        pLinker_cur = pLinker_cur->next;
-                        while( pLinker_cur && pLinker_cur->prev )
-                            pLinker_cur = pLinker_cur->prev;
-                    }
-                    else
-                        pLinker_cur = 0;
-
-                    pElem_desc_cur->pLinker_head = pLinker_cur;
-
-                    // update current linker
-                    while( pLinker_cur && pLinker_cur->next )
-                        pLinker_cur = pLinker_cur->next;
-
-                    pElem_desc_cur->pLinker_cur = pLinker_cur;
 
                     // release element
                     pLinker_tmp->next = pLinker_tmp->prev = 0;
