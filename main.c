@@ -56,7 +56,7 @@ _user_elem_recv_msg(
     smf_args_t              *pShare_info)
 {
     smf_err_t       rval = SMF_ERR_OK;
-     mbox_t          *pMbox = (mbox_t*)pMsg;
+    mbox_t          *pMbox = (mbox_t*)pMsg;
 
     pShare_info->arg[0].u32_value++;
     dbg("enter '%s', ref= %d, msg= %p, share= %d\n", pElem_prev->name, pMbox->ref_cnt, pMsg, pShare_info->arg[0].u32_value);

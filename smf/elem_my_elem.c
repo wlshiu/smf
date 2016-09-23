@@ -183,6 +183,21 @@ _my_elem_deinit(
 
         mutex = pMgr->mutex;
 
+        // consume the mbox
+        while( 1 )
+        {
+            mbox_t      *pMbox = 0;
+            SmfPMsgq_Node_Pop(pHPMsg, (void*)&pMbox);
+            if( !pMbox )    break;
+
+            if( pMbox->cb_mbox_destroy )
+            {
+                CB_MBOX_DESTROY     cb_mbox_destroy = pMbox->cb_mbox_destroy;
+                dbg("'%s' call delete\n", pElem_prev->name);
+                cb_mbox_destroy(&pMbox, (void*)pElem_prev);
+            }
+        }
+
         SmfPMsgq_Destroy(&pHPMsg);
 
         free(pMgr);
